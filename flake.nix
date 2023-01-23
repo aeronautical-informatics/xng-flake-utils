@@ -109,8 +109,9 @@
         };
 
       # build a LithOS OPS
-      lib.buildLithOsOps = { pkgs, src, name ? "lithos-ops" }: pkgs.stdenvNoCC.mkDerivation {
-        inherit name src;
+      lib.buildLithOsOps = { pkgs, src, name ? "lithos-ops", patches ? [] }: pkgs.stdenvNoCC.mkDerivation {
+        inherit name patches src;
+
         dontStrip = true;
         dontPatchELF = true;
         installPhase = ''
@@ -293,7 +294,16 @@
                 "${xngOps.dev}/lib/xng.${target}.bin@$hypervisor_entry_point")
 
             ${builtins.concatStringsSep "\n"
-              (pkgs.lib.attrsets.mapAttrsToList (name: { src, enableLithOs ? false, ltcf ? null }: ''
+              (pkgs.lib.attrsets.mapAttrsToList (name: {
+                # Path to partition source code
+                src,
+                # Link against LithOS
+                enableLithOs ? false,
+                # Link against XRE even if linking against LithOS
+                forceXre ? false,
+                # Path to LithOS control file
+                ltcf ? null
+              }: ''
                 info "gathering information for partition ${name}"
                 local partition_xml=$(xml sel -N 'n=${baseUrl}xngPartitionXml' -t \
                     -if '/n:Partition/@name="${name}"' --inp-name $(find ${xcf} -name '*.xml'))
@@ -343,9 +353,11 @@
                     { set +x; } 2>/dev/null
 
                     object_code+=("${lithOsOps}/lib/lte_kernel.o" "$ltcf_out_file")
+
                     extra_ld_args+=(
                         "-T${lithOsOps}/lds/lithos-xng-${target}.lds"
                         "--start-group"
+                        ${if forceXre then "-lxre.${fp}fp.armv7a-vmsa-tz" else ""}
                         "-lxc.${fp}fp.armv7a-vmsa-tz"
                         "-lfw.${fp}fp.armv7a-vmsa-tz"
                         "--end-group"
