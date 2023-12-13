@@ -8,12 +8,12 @@
       lib.replaceDots = s: builtins.replaceStrings [ "." ] [ "_" ] s;
 
       # build an XNG OPS from a tarball release
-      lib.buildXngOps = { pkgs, src ? null, srcs ? null, name ? "xng-ops", target ? "armv7a-vmsa-tz" }:
+      lib.buildXngOps = { pkgs, version ? "1.4", src ? null, srcs ? null, pname ? "xng-ops", target ? "armv7a-vmsa-tz" }:
         let
           archDefine = builtins.replaceStrings [ "-" ] [ "_" ] (pkgs.lib.toUpper target);
         in
         pkgs.stdenv.mkDerivation {
-          inherit name src srcs;
+          inherit pname src srcs version;
 
           nativeBuildInputs = [ pkgs.autoPatchelfHook ];
           buildInputs = with pkgs; [
@@ -109,8 +109,8 @@
         };
 
       # build a LithOS OPS
-      lib.buildLithOsOps = { pkgs, src, name ? "lithos-ops", patches ? [] }: pkgs.stdenvNoCC.mkDerivation {
-        inherit name patches src;
+      lib.buildLithOsOps = { pkgs, src, version ? "1.0", pname ? "lithos-ops", patches ? [ ] }: pkgs.stdenvNoCC.mkDerivation {
+        inherit patches pname src version;
 
         dontStrip = true;
         dontPatchELF = true;
@@ -232,6 +232,7 @@
           target = xngOps.meta.target;
           fp = if (pkgs.lib.hasAttr "fpu" stdenv.hostPlatform.gcc) then "hard" else "soft";
           baseUrl = "http://www.fentiss.com/";
+          atLeastVersion1_4_7 = pkgs.lib.strings.versionAtLeast xngOps.version "1.4.7";
         in
         # either an lithOsOps is available, or no partition requires one.
         assert lithOsOps != null || pkgs.lib.lists.all ({ enableLithOs ? false, ... }: !enableLithOs) (pkgs.lib.attrValues partitions);
@@ -280,6 +281,8 @@
           buildPhase = ''
             runHook preBuild
 
+            local xngVersion="${xngOps.version}"
+
             # fail on everything
             set -Eeuo pipefail
 
@@ -291,10 +294,32 @@
             { set +x; } 2>/dev/null
 
             info "gathering information"
-            local hypervisor_xml=$(xml sel -N 'n=${baseUrl}xngModuleXml' -t \
-                -v '/n:Module/n:Hypervisor/@hRef' ${xcf}/module.xml)
-            local hypervisor_entry_point=$(xml sel -N 'n=${baseUrl}xngHypervisorXml' -t \
-                -v '/n:Hypervisor/@entryPoint' ${xcf}/$hypervisor_xml)
+            if [ "version_at_least_1_4_7" = ${if atLeastVersion1_4_7 then "version_at_least_1_4_7" else ""} ]
+            then
+              local ns="xcfXml"
+              local hvNs="$ns"
+              local moduleNs="$ns"
+              local partitionNs="$ns"
+              local hypervisor_entry_point=$(xmlstarlet tr --xinclude ${./.}/passthrough.xsl ${xcf}/module.xml | xml sel -N "n=${baseUrl}$moduleNs" -t \
+                  -v '/n:Module/n:Hypervisor/@entryPoint')
+            else
+              local hypervisor_xml=$(xml sel -N 'n=${baseUrl}xngModuleXml' -t \
+                  -v '/n:Module/n:Hypervisor/@hRef' ${xcf}/module.xml)
+              local hypervisor_entry_point=$(xml sel -N 'n=${baseUrl}xngHypervisorXml' -t \
+                  -v '/n:Hypervisor/@entryPoint' ${xcf}/$hypervisor_xml)
+              local hvNs="xngHypervisorXml"
+              local moduleNs="xngModuleXml"
+              local partitionNs="xngPartitionXml"
+            fi
+
+            if [ -z "$hypervisor_entry_point" ]
+            then
+              printf "Failed to discover hypervisor entry point"
+              exit 1
+            else
+              printf "Hypervisor entry point is $hypervisor_entry_point"
+            fi
+
             local xcf_entry_point=0x200000
 
             local args=("-e" "$hypervisor_entry_point" \
@@ -312,7 +337,7 @@
                 ltcf ? null
               }: ''
                 info "gathering information for partition ${name}"
-                local partition_xml=$(xml sel -N 'n=${baseUrl}xngPartitionXml' -t \
+                local partition_xml=$(xml sel -N "n=${baseUrl}$partitionNs" -t \
                     -if '/n:Partition/@name="${name}"' --inp-name $(find ${xcf} -name '*.xml'))
 
                 # check partition xml file exits
@@ -321,7 +346,7 @@
                     exit 127
                 }
 
-                local entry_point=$(xml sel -N 'n=${baseUrl}xngPartitionXml' -t \
+                local entry_point=$(xml sel -N "n=${baseUrl}$partitionNs" -t \
                     -v '/n:Partition/@entryPoint' $partition_xml)
 
                 # check entry point is a positive number
@@ -435,6 +460,7 @@
         in
         { }
         // (import ./checks/xng-1.4-smp.nix { inherit pkgs; xng-flake-utils = self; })
+        // (import ./checks/xng-1.4.7-smp.nix { inherit pkgs; xng-flake-utils = self; })
         // (import ./checks/xng-1.3-monocore.nix { inherit pkgs; xng-flake-utils = self; })
         // (import ./checks/ske-2.1.0.nix { inherit pkgs; xng-flake-utils = self; });
     };
