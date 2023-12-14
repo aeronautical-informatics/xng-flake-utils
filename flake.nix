@@ -294,7 +294,7 @@
             { set +x; } 2>/dev/null
 
             info "gathering information"
-            if [ "version_at_least_1_4_7" = ${if atLeastVersion1_4_7 then "version_at_least_1_4_7" else ""} ]
+            if [ "version_at_least_1_4_7" = ${if atLeastVersion1_4_7 then "version_at_least_1_4_7" else "no"} ]
             then
               local ns="xcfXml"
               local hvNs="$ns"
