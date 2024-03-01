@@ -1,16 +1,17 @@
 { pkgs, xng-flake-utils }:
 let
-  xngVersion = "1.4-smp";
+  xngVersion = "1.4.7";
+  lithOsVersion = "2.0.2";
   srcs = {
     xng = pkgs.requireFile {
-      name = "14-033.094.ops+armv7a-vmsa-tz+zynq7000.r16736.tbz2";
+      name = "14-033.094.ops+smp+armv7a-vmsa-tz+zynq7000.r22422.tbz2";
       url = "http://fentiss.com";
-      sha256 = "1gb0cq3mmmr2fqj49p4svx07h5ccs8v564awlsc56mfjhm6jg3n4";
+      hash = "sha256-P1q5UxHcZHNCJfguHuChIvhJ/DN///ZPfYx+p7UiRXQ=";
     };
     lithos = pkgs.requireFile {
-      name = "020.080.ops.r7919+xngsmp.tbz2";
+      name = "21-004.080.ops.r8942.tbz2";
       url = "https://fentiss.com";
-      sha256 = "1b73d6x3galw3bhj5nac7ifgp15zrsyipn4imwknr24gp1l14sc8";
+      hash = "sha256-ubJD7EILrp4VE2rAtADWwrIrSiOx2u0pkZU63M9bBjk=";
     };
   };
   examples = [
@@ -53,4 +54,4 @@ let
   ];
   xngChecks = import ./xng-checks.nix { inherit xng-flake-utils; };
 in
-xngChecks { inherit pkgs examples srcs xngVersion; }
+xngChecks { inherit pkgs examples srcs xngVersion lithOsVersion; }
