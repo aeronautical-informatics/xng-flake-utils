@@ -48,6 +48,6 @@ mapAttrs'
     };
     lithOsOps = buildLithOsOps {
       inherit pkgs srcs;
-      version = lithOsVersion;
+      version = srcs.lithOsVersion or "unknown";
     };
   })
